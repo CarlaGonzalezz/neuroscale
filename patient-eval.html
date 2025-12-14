@@ -226,15 +226,19 @@
 <script src="firebase-config.js"></script>
 <script>
   (function(){
-    // ------------------------- helpers -------------------------
+    // ========================= HELPERS =========================
     function qs(sel){ return document.querySelector(sel); }
     function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
-    function escapeHtml(s){ return s == null ? "" : String(s)
-      .replaceAll('&','&amp;').replaceAll('<','&lt;')
-      .replaceAll('>','&gt;').replaceAll('"','&quot;')
-      .replaceAll("'",'&#39;'); }
-    function getParam(name){ return new URL(location.href).searchParams.get(name); }
-    // ------------------------- DOM refs -------------------------
+    function escapeHtml(s){ 
+      return s == null ? "" : String(s)
+        .replaceAll('&','&amp;').replaceAll('<','&lt;')
+        .replaceAll('>','&gt;').replaceAll('"','&quot;')
+        .replaceAll("'",'&#39;'); 
+    }
+    function getParam(name){ 
+      return new URL(location.href).searchParams.get(name); 
+    }
+    // ========================= DOM REFS =========================
     const qrId = getParam('qr');
     const statusEl = qs('#status');
     const contentEl = qs('#content');
@@ -247,92 +251,114 @@
     const btnSubmit = qs('#btnSubmit');
     const scoreBox = qs('#scoreBox');
     const finalMsg = qs('#finalMsg');
+    // Validar QR ID
     if (!qrId) {
       statusEl.textContent = "URL inválida: falta parámetro QR.";
+      statusEl.style.background = "#fee";
+      statusEl.style.color = "#c00";
       return;
     }
-    statusEl.textContent = "Buscando QR...";
+    statusEl.textContent = "Buscando información del QR...";
     const db = firebase.database();
+    // ========================= INIT =========================
     async function init() {
       try {
-        // ---------- lectura QR ----------
+        // ========== LECTURA DEL QR ==========
         const qrSnap = await db.ref(`qrCodes/${qrId}`).get();
         if (!qrSnap.exists()) {
           statusEl.textContent = "QR no encontrado o expirado.";
+          statusEl.style.background = "#fee";
+          statusEl.style.color = "#c00";
           return;
         }
         const qr = qrSnap.val();
         const medicoId = qr.medicoId;
         const pacienteId = qr.pacienteId;
-        // ---------- paciente ----------
-        let paciente = null;
+        const escalaIdSugerida = qr.escalaId;
+        console.log('QR válido:', { medicoId, pacienteId, escalaIdSugerida });
+        // ========== DATOS DEL PACIENTE ==========
         let pacienteNombre = `Paciente ${String(pacienteId).slice(0,6)}`;
         try {
           const pSnap = await db.ref(`pacientes/${medicoId}/${pacienteId}`).get();
           if (pSnap.exists()) {
-            paciente = pSnap.val();
+            const paciente = pSnap.val();
             pacienteNombre = `${paciente.nombre || ''} ${paciente.apellido || ''}`.trim() || pacienteNombre;
           }
         } catch(e){
-          console.warn("No se pudo leer paciente (puede ser por reglas):", e);
+          console.warn("No se pudo leer paciente (permisos):", e);
         }
-        // ---------- médico ----------
-        let medico = null;
+        // ========== DATOS DEL MÉDICO ==========
         let medicoEmail = null;
-        let medicoNombre = null;
+        let medicoNombre = "Doctor/a";
         try {
           const mSnap = await db.ref(`medicos/${medicoId}`).get();
           if (mSnap.exists()) {
-            medico = mSnap.val();
+            const medico = mSnap.val();
             medicoEmail = medico.email || null;
-            medicoNombre = medico.nombre || null;
+            medicoNombre = medico.nombre || medico.displayName || "Doctor/a";
           }
         } catch(e){
-          console.warn("No se pudo leer medico:", e);
+          console.warn("No se pudo leer médico:", e);
         }
-        // ---------- escalas ----------
+        console.log('Médico:', { email: medicoEmail, nombre: medicoNombre });
+        // ========== CARGAR ESCALAS ==========
         if (typeof SCALES_DATABASE !== "object") {
-          statusEl.textContent = "Error cargando escalas.";
+          statusEl.textContent = "Error cargando base de datos de escalas.";
+          statusEl.style.background = "#fee";
           return;
         }
         const allScales = Object.values(SCALES_DATABASE);
+        // Función para renderizar opciones del select
         function renderScaleOptions(list) {
           scaleSelect.innerHTML = "";
           if (!list.length) {
-          const o = document.createElement("option");
-          o.textContent = "No se encontraron escalas";
-          o.disabled = true;
-          scaleSelect.appendChild(o);
-          return;
+            const o = document.createElement("option");
+            o.textContent = "No se encontraron escalas";
+            o.disabled = true;
+            scaleSelect.appendChild(o);
+            return;
           }
-        list.forEach(s => {
-        const o = document.createElement("option");
-        o.value = s.id;
-        o.textContent = s.name;
-        scaleSelect.appendChild(o);
-        });
-      }
-      // carga inicial
-      renderScaleOptions(allScales);
-      scaleSearch.addEventListener("input", () => {
-      const q = scaleSearch.value.toLowerCase().trim();
-      const filtered = allScales.filter(s =>
-      s.name.toLowerCase().includes(q)
-      );
-      renderScaleOptions(filtered);
-      });
-        // seleccionar escala sugerida
-        if (qr.escalaId && scaleSelect.querySelector(`option[value="${qr.escalaId}"]`)) {
-          scaleSelect.value = qr.escalaId;
+          list.forEach(s => {
+            const o = document.createElement("option");
+            o.value = s.id;
+            o.textContent = s.name;
+            scaleSelect.appendChild(o);
+          });
         }
-        suggestedEl.textContent = `${escapeHtml(scaleSelect.options[scaleSelect.selectedIndex].text)} — Paciente: ${escapeHtml(pacienteNombre)}`;
+        // Cargar todas las escalas inicialmente
+        renderScaleOptions(allScales);
+        // ========== BÚSQUEDA DE ESCALAS ==========
+        scaleSearch.addEventListener("input", () => {
+          const query = scaleSearch.value.toLowerCase().trim();
+          if (!query) {
+            // Si está vacío, mostrar todas
+            renderScaleOptions(allScales);
+          } else {
+            // Filtrar por nombre
+            const filtered = allScales.filter(s =>
+              s.name.toLowerCase().includes(query)
+            );
+            renderScaleOptions(filtered);
+          }
+        });
+        // ========== SELECCIONAR ESCALA SUGERIDA ==========
+        if (escalaIdSugerida && scaleSelect.querySelector(`option[value="${escalaIdSugerida}"]`)) {
+          scaleSelect.value = escalaIdSugerida;
+        }
+        const escalaSugeridaNombre = scaleSelect.options[scaleSelect.selectedIndex]?.text || "Sin escala";
+        suggestedEl.innerHTML = `
+          <strong>Escala sugerida:</strong> ${escapeHtml(escalaSugeridaNombre)}<br>
+          <span class="muted small">Paciente: ${escapeHtml(pacienteNombre)}</span>
+        `;
         contentEl.classList.remove('hidden');
-        statusEl.textContent = "Listo. Cargue la escala.";    
-        // ---------- loader de escala ----------
+        statusEl.textContent = "Listo. Puede cargar la escala o buscar otra.";
+        statusEl.style.background = "#f0fdf4";
+        statusEl.style.color = "#065f46";
+        // ========== CARGAR ESCALA ==========
         let currentScale = null;
         btnLoadScale.addEventListener('click', () => {
           const id = scaleSelect.value;
-          loadScale(id);
+          if (id) loadScale(id);
         });
         function loadScale(id) {
           currentScale = SCALES_DATABASE[id];
@@ -340,76 +366,95 @@
             scaleWrapper.innerHTML = "<div class='small muted'>Escala no disponible</div>";
             return;
           }
-          suggestedEl.textContent = `${escapeHtml(currentScale.name)} — Paciente: ${escapeHtml(pacienteNombre)}`;
+          // Actualizar título
+          suggestedEl.innerHTML = `
+            <strong>${escapeHtml(currentScale.name)}</strong><br>
+            <span class="muted small">Paciente: ${escapeHtml(pacienteNombre)}</span>
+          `;
           renderForm(currentScale);
           btnSubmit.disabled = true;
           scoreBox.textContent = "";
           finalMsg.classList.add("hidden");
+          // Scroll al formulario
+          scaleWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        // auto cargar sugerida
-        loadScale(scaleSelect.value);
-        // ---------- render form ----------
+        // Auto-cargar escala sugerida
+        if (escalaIdSugerida) {
+          loadScale(escalaIdSugerida);
+        }
+        // ========== RENDERIZAR FORMULARIO ==========
         function renderForm(scale) {
           scaleWrapper.innerHTML = "";
           const form = document.createElement("div");
           form.className = "scale-form";
+          
           (scale.sections || []).forEach((sec, sIndex) => {
             const fs = document.createElement("fieldset");
             const lg = document.createElement("legend");
             lg.textContent = sec.title || `Sección ${sIndex+1}`;
             fs.appendChild(lg);
+            
             (sec.questions || []).forEach((q, qIndex) => {
               const ql = document.createElement("label");
               ql.className = "q";
               ql.textContent = `${qIndex+1}. ${q.text}`;
               fs.appendChild(ql);
-              // Contenedor de opciones con grid
+              
+              // Contenedor de opciones
               const opts = document.createElement("div");
               opts.className = "opts";
+              
               (q.options || []).forEach(opt => {
                 const id = `opt_${q.id}_${opt.value}_${Math.random().toString(36).slice(2,6)}`;
+                
                 // Label contenedor
                 const lab = document.createElement("label");
                 lab.className = "opt";
+                
                 // Radio button
                 const inp = document.createElement("input");
                 inp.type = "radio";
                 inp.name = q.id;
                 inp.value = opt.value;
                 inp.id = id;
-                // IMAGEN
+                
+                // Imagen (si existe)
                 if (opt.img) {
                   const img = document.createElement("img");
                   img.src = opt.img;
                   img.alt = opt.label || "";
-                  // Si la imagen no carga, ocultarla
                   img.onerror = function() {
                     this.style.display = "none";
-                    console.warn("No se pudo cargar:", opt.img);
-                  };
-                  img.onload = function() {
-                    console.log("Imagen cargada:", opt.img);
+                    console.warn("No se pudo cargar imagen:", opt.img);
                   };
                   lab.appendChild(img);
                 }
+                
                 // Texto de la opción
                 const sp = document.createElement("span");
                 sp.textContent = opt.label || "";
+                
                 lab.appendChild(inp);
                 lab.appendChild(sp);
                 opts.appendChild(lab);
               });
+              
               fs.appendChild(opts);
             });
+            
             form.appendChild(fs);
           });
+          
           scaleWrapper.appendChild(form);
         }
-        // ---------- cálculo ----------
+        
+        // ========== CALCULAR PUNTAJE ==========
         function calculate() {
           if (!currentScale) return {score:0, answers:{}, interpretation:null};
+          
           let score = 0;
           const answers = {};
+          
           currentScale.sections.forEach(sec => {
             sec.questions.forEach(q => {
               const sel = document.querySelector(`input[name="${q.id}"]:checked`);
@@ -418,40 +463,55 @@
               score += val;
             });
           });
+          
           let interpretation = null;
           if (currentScale.hasInterpretation && typeof currentScale.interpretation === "function") {
             interpretation = currentScale.interpretation(score);
           }
+          
           return {score, answers, interpretation};
         }
+        
         btnCalculate.addEventListener("click", () => {
           const {score, interpretation} = calculate();
+          
           scoreBox.textContent =
-            `Puntaje: ${score}` +
+            `Puntaje Total: ${score}` +
             (interpretation ? ` — ${interpretation.level || interpretation}` : "");
+          
           btnSubmit.disabled = false;
+          scoreBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
-        // ---------- submit ----------
+        
+        // ========== ENVIAR EVALUACIÓN ==========
         btnSubmit.addEventListener("click", async () => {
           btnSubmit.disabled = true;
-          statusEl.textContent = "Enviando evaluación...";
+          btnSubmit.innerHTML = '<span class="spinner"></span> Enviando...';
+          statusEl.textContent = "📤 Enviando evaluación...";
+          
           try {
             const {score, answers, interpretation} = calculate();
             const evalId = db.ref().push().key;
+            
             const payload = {
               pacienteId,
+              pacienteNombre,
               escalaId: currentScale.id,
               escalaNombre: currentScale.name,
               fecha: new Date().toISOString(),
+              timestamp: Date.now(),
               respuestas: answers,
               puntajeTotal: score,
               interpretacion: interpretation ? (interpretation.level || interpretation) : null,
               completadoPor: "paciente-qr",
               estado: "completada"
             };
-            // guardar evaluación
+            
+            // 1. Guardar evaluación
             await db.ref(`evaluaciones/${medicoId}/${pacienteId}/${evalId}`).set(payload);
-            // crear notificación interna para el médico
+            console.log('Evaluación guardada:', evalId);
+            
+            // 2. Crear notificación interna
             const notifId = db.ref().push().key;
             await db.ref(`notificaciones/${medicoId}/${notifId}`).set({
               tipo: "nueva-evaluacion",
@@ -463,29 +523,87 @@
               fecha: new Date().toISOString(),
               leida: false
             });
-            // marcar QR como usado
+            console.log('Notificación creada:', notifId);
+            
+            // 3. Marcar QR como usado
             try {
               await db.ref(`qrCodes/${qrId}`).update({
                 estado: "usado",
                 fechaUsado: new Date().toISOString()
               });
-            } catch(e){ console.warn("No se pudo actualizar QR:", e); }
-            // RESULTADO FINAL: Mostrar el mensaje de confirmación
-            statusEl.textContent = "Evaluación enviada.";
+            } catch(e){ 
+              console.warn("No se pudo actualizar QR:", e); 
+            }
+            
+            // 4. ENVIAR EMAIL AL MÉDICO
+            if (medicoEmail) {
+              try {
+                console.log('Enviando email a:', medicoEmail);
+                
+                const emailResponse = await fetch('/.netlify/functions/send-notification', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    medicoEmail: medicoEmail,
+                    medicoNombre: medicoNombre,
+                    pacienteNombre: pacienteNombre,
+                    escalaNombre: currentScale.name,
+                    dashboardURL: `${window.location.origin}/dashboard.html`
+                  })
+                });
+                
+                if (emailResponse.ok) {
+                  const emailResult = await emailResponse.json();
+                  console.log('Email enviado:', emailResult.emailId);
+                } else {
+                  const error = await emailResponse.json();
+                  console.warn('Error enviando email:', error);
+                }
+              } catch(emailError) {
+                console.warn('No se pudo enviar email (función no disponible?):', emailError);
+              }
+            } else {
+              console.warn('No hay email del médico para enviar notificación');
+            }
+            
+            // 5. Mostrar mensaje de éxito
+            statusEl.textContent = "Evaluación enviada correctamente";
+            statusEl.style.background = "#f0fdf4";
+            statusEl.style.color = "#065f46";
+            
             finalMsg.classList.remove("hidden");
-            finalMsg.innerHTML = "<strong>Gracias.</strong> Su evaluación fue registrada correctamente.";
+            finalMsg.innerHTML = `
+              <strong>¡Gracias!</strong>
+              Su evaluación fue registrada correctamente.<br>
+              ${medicoEmail ? 'Se ha notificado al médico por email.' : ''}
+            `;
+            
+            // Deshabilitar todos los inputs
             qsa("input").forEach(i => i.disabled = true);
+            qsa("button").forEach(b => b.disabled = true);
+            
+            // Scroll al mensaje final
+            finalMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
           } catch(err) {
-            console.error(err);
-            statusEl.textContent = "Error enviando evaluación.";
+            console.error('Error enviando evaluación:', err);
+            statusEl.textContent = "Error enviando evaluación. Intente nuevamente.";
+            statusEl.style.background = "#fee";
+            statusEl.style.color = "#c00";
             btnSubmit.disabled = false;
+            btnSubmit.innerHTML = 'Enviar Evaluación';
           }
         });
+        
       } catch(err) {
-        console.error(err);
-        statusEl.textContent = "Error inicializando.";
+        console.error('Error inicializando:', err);
+        statusEl.textContent = "Error inicializando la aplicación.";
+        statusEl.style.background = "#fee";
+        statusEl.style.color = "#c00";
       }
     }
+    
+    // Iniciar aplicación
     init();
   })();
 </script>
