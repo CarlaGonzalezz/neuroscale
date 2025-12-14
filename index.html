@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NeuroScale - Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="cerebro (1).png" />
+    <!-- Tipografía -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <!-- Firebase y librerías -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <!-- Librerías permitidas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <!-- App -->
+    <script src="firebase-config.js"></script>
+    <script src="scales-data.js" defer></script>
+    <script src="pdf-generator.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="header">
+      <div class="left" style="display: flex; align-items: center; gap: 14px">
+        <img src="cerebro.png" alt="cerebro" />
+        <span
+          style="
+            font-family: 'Cormorant', serif;
+            font-weight: 600;
+            font-size: 2rem;
+            color: #1e3a5f;
+            letter-spacing: 0.02em;
+          "
+          >NeuroScale</span
+        >
+      </div>
+      <div class="right" style="display: flex; align-items: center; gap: 10px">
+        <span id="doctorName" class="doctor-name">Dr.</span>
+        <button id="btnSettings" class="icon-btn" title="Configuración">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M19.14 12.936a7.976 7.976 0 0 0 .06-.936 7.976 7.976 0 0 0-.06-.936l2.036-1.59a.5.5 0 0 0 .12-.648l-1.928-3.34a.5.5 0 0 0-.6-.228l-2.4.96a7.96 7.96 0 0 0-1.62-.936l-.36-2.52A.5.5 0 0 0 12.5 1h-3a.5.5 0 0 0-.5.42l-.36 2.52a7.96 7.96 0 0 0-1.62.936l-2.4-.96a.5.5 0 0 0-.6.228L1.09 7.1a.5.5 0 0 0 .12.648l2.036 1.59c-.04.31-.06.62-.06.936s.02.626.06.936L1.21 12.8a.5.5 0 0 0-.12.648l1.928 3.34a.5.5 0 0 0 .6.228l2.4-.96c.5.38 1.05.69 1.62.936l.36 2.52a.5.5 0 0 0 .5.42h3a.5.5 0 0 0 .5-.42l.36-2.52c.57-.246 1.12-.556 1.62-.936l2.4.96a.5.5 0 0 0 .6-.228l1.928-3.34a.5.5 0 0 0-.12-.648l-2.036-1.59zM10 12a2 2 0 1 1 4 0 2 2 0 0 1-4 0z"
+              fill="#2c5f7c"
+            />
+          </svg>
+        </button>
+        <button id="btnLogout" class="btn btn-secondary">Logout</button>
+      </div>
+    </header>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <nav>
+          <!-- Inicio -->
+          <button class="nav-item active" data-view="dashboard">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"
+                fill="#2c5f7c"
+              />
+            </svg>
+            <span>Inicio</span>
+          </button>
+          <!-- Pacientes -->
+          <button class="nav-item" data-view="patients">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z"
+                fill="#2c5f7c"
+              />
+            </svg>
+            <span>Pacientes</span>
+          </button>
+          <!-- Escalas -->
+          <button class="nav-item" data-view="scales">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 5h18v2H3V5zm2 4h14v10H5V9zm4 2v6h2v-6H9zm4 0v6h2v-6h-2z"
+                fill="#2c5f7c"
+              />
+            </svg>
+            <span>Escalas</span>
+          </button>
+          <!-- Reportes -->
+          <button class="nav-item" data-view="reports">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1v5h5"
+                stroke="#2c5f7c"
+                stroke-width="2"
+              />
+              <path
+                d="M8 13h8M8 17h8M8 9h4"
+                stroke="#2c5f7c"
+                stroke-width="2"
+              />
+            </svg>
+            <span>Reportes</span>
+          </button>
+          <!-- Perfil -->
+          <button class="nav-item" data-view="profile">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-5.523 0-10 2.239-10 5v3h20v-3c0-2.761-4.477-5-10-5z"
+                fill="#2c5f7c"
+              />
+            </svg>
+            <span>Perfil</span>
+          </button>
+        </nav>
+      </aside>
+      <main class="content">
+        <!-- Dashboard -->
+<section id="view-dashboard" class="view active">
+  <h2>Inicio</h2>
+
+  <!-- NOTIFICACIONES INTERNAS -->
+  <div class="card">
+    <h3>Notificaciones</h3>
+
+    <div id="dashboardNotifications">
+      <!-- Mensaje por defecto -->
+      <div class="no-notifications muted" style="color:#94a3b8; font-size:0.9rem;">
+        No hay notificaciones nuevas
+      </div>
+
+      <!-- Lista real de notificaciones (JS escribe acá) -->
+      <ul id="notificationList" class="list" style="margin-top:8px;"></ul>
+    </div>
+  </div>
+
+  <br>
+
+  <!-- Estadísticas -->
+  <div class="grid">
+    <div class="card stat">
+      <div class="stat-title">Pacientes</div>
+      <div class="stat-value" id="statPatients">0</div>
+    </div>
+    <div class="card stat">
+      <div class="stat-title">Evaluaciones este mes</div>
+      <div class="stat-value" id="statEvalsMonth">0</div>
+    </div>
+    <div class="card stat">
+      <div class="stat-title">Evaluaciones totales</div>
+      <div class="stat-value" id="statTotalEvals">0</div>
+    </div>
+  </div>
+
+  <!-- Últimos pacientes evaluados -->
+  <div class="card">
+    <h3>Últimos pacientes evaluados</h3>
+    <ul id="lastEvaluatedList" class="list"></ul>
+  </div>
+</section>
+        <!-- Pacientes -->
+        <section id="view-patients" class="view">
+          <div class="toolbar">
+            <input
+              type="text"
+              id="patientSearch"
+              placeholder="Buscar por nombre o DNI"
+            />
+            <button id="btnNewPatient" class="btn btn-primary">
+              Nuevo Paciente
+            </button>
+          </div>
+          <div id="patientsList" class="grid"></div>
+          <div id="patientFormModal" class="modal hidden">
+            <div class="modal-content">
+              <h3 id="patientFormTitle">Nuevo paciente</h3>
+              <label>Nombre</label><input id="pNombre" /> <label>Apellido</label
+              ><input id="pApellido" /> <label>DNI</label><input id="pDni" />
+              <label>Edad</label><input id="pEdad" type="number" />
+              <label>Diagnóstico</label><input id="pDiagnostico" />
+              <div class="modal-actions">
+                <button id="btnCancelPatient" class="btn btn-secondary">
+                  Cancelar
+                </button>
+                <button id="btnSavePatient" class="btn btn-primary">
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="patientDetail" class="card hidden"></div>
+        </section>
+        <!-- Escalas -->
+        <section id="view-scales" class="view">
+          <h2>Escalas</h2>
+          <!--BUSCADOR -->
+          <input
+            id="scaleSearch"
+            type="text"
+            placeholder="Buscar escala por nombre..."
+            style="
+              width: 100%;
+              padding: 10px 12px;
+              margin: 8px 0 14px 0;
+              border: 1px solid #cbd5e1;
+              border-radius: 6px;
+              font-size: 1rem;
+            "
+          />
+          <div id="scalesGrid" class="grid"></div>
+          <div id="scaleApply" class="card hidden scale-form"></div>
+          <!-- Modal para BUSCAR paciente -->
+          <div id="selectPatientModal" class="modal hidden">
+            <div class="modal-content" style="max-width: 420px">
+              <h3>Seleccionar paciente</h3>
+
+              <input
+                id="patientSearchInput"
+                type="text"
+                placeholder="Buscar por nombre o DNI..."
+                style="
+                  width: 100%;
+                  padding: 10px;
+                  margin: 10px 0;
+                  border: 1px solid #ccd;
+                  border-radius: 6px;
+                "
+              />
+
+              <div
+                id="patientSearchResults"
+                style="
+                  max-height: 260px;
+                  overflow-y: auto;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 6px;
+                  padding: 6px;
+                "
+              ></div>
+
+              <div class="modal-actions" style="margin-top: 16px">
+                <button id="btnCancelSelectPatient" class="btn btn-secondary">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <!-- Reportes -->
+        <section id="view-reports" class="view">
+          <h2>Reportes</h2>
+          <div
+            class="toolbar"
+            style="
+              display: grid;
+              grid-template-columns: 2fr 1fr 1fr auto;
+              gap: 12px;
+              margin-bottom: 24px;
+            "
+          >
+            <input
+              type="text"
+              id="filterSearch"
+              placeholder="Buscar por nombre de paciente o DNI..."
+              style="width: 100%"
+            />
+            <select id="filterPatient">
+              <option value="">Todos los pacientes</option>
+            </select>
+            <select id="filterScale">
+              <option value="">Todas las escalas</option>
+            </select>
+            <button id="btnExportSelected" class="btn btn-primary">
+              Exportar PDF
+            </button>
+          </div>
+          <div style="margin-bottom: 12px; color: #64748b; font-size: 0.9rem">
+            <span id="reportCount">0 evaluaciones encontradas</span>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>FECHA</th>
+                <th>PACIENTE</th>
+                <th>ESCALA</th>
+                <th>PUNTAJE</th>
+                <th style="text-align: right">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody id="reportsTableBody"></tbody>
+          </table>
+        </section>
+        <!-- Perfil -->
+        <section id="view-profile" class="view">
+          <h2>Perfil</h2>
+          <div class="card">
+            <label>Nombre</label><input id="medNombre" /> <label>Email</label
+            ><input id="medEmail" disabled /> <label>Matrícula</label
+            ><input id="medMatricula" /> <label>Especialidad</label
+            ><input id="medEspecialidad" /> <label>Hospital</label
+            ><input id="medHospital" />
+            <div class="actions">
+              <button id="btnSaveProfile" class="btn btn-primary">
+                Guardar cambios
+              </button>
+              <button id="btnChangePassword" class="btn btn-secondary">
+                Cambiar contraseña
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <footer class="footer">NeuroScale © desarrollado por Carla González</footer>
+  </body>
+</html>

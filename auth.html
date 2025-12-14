@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>NeuroScale - Acceso</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="cerebro (1).png" />
+<link rel="stylesheet" href="style.css" />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+</head>
+<body class="auth-body">
+<div class="auth-container">
+  <div style="text-align: center; margin-bottom: 3rem;">
+    <img src="cerebro (1).png" alt="cerebro">
+    <h1 style="font-family: 'Cormorant', serif; font-weight: 600; font-size: 3.8rem; color: white; margin: 0; letter-spacing: 0.03em;">NeuroScale</h1>
+  </div>
+  <div class="card">
+    <!-- FORMULARIO LOGIN -->
+    <div id="loginForm" class="form">
+      <h2>Ingresar</h2>
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="medico@hospital.com" />
+      <label>Contraseña</label>
+      <input type="password" id="loginPassword" placeholder="********" />
+      <button id="btnLogin" class="btn btn-primary">Entrar</button>
+      <p class="muted">
+        ¿No tenés cuenta?
+        <a id="linkShowRegister" href="#">Crear cuenta</a>
+      </p>
+    </div>
+
+    <!-- FORMULARIO REGISTRO -->
+    <div id="registerForm" class="form hidden">
+      <h2>Crear cuenta</h2>
+      <label>Email</label>
+      <input type="email" id="registerEmail" />
+      <label>Contraseña (mínimo 6 caracteres)</label>
+      <input type="password" id="registerPassword" />
+      
+      <!-- Términos -->
+      <div style="margin-top:10px; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="registerTerms" style="width:auto; margin:0; cursor:pointer;" />
+        <label for="registerTerms" style="margin:0; display:inline; font-size:0.9rem; font-weight:300; text-transform:none; letter-spacing:0;">
+          Acepto los
+          <a href="terminos.html" target="_blank" style="color:#1e3a5f; text-decoration:underline;">términos y condiciones</a>
+        </label>
+      </div>
+      
+      <button id="btnRegister" class="btn btn-primary">Registrarme</button>
+      <p class="muted">
+        ¿Ya tenés cuenta?
+        <a id="linkShowLogin" href="#">Ingresar</a>
+      </p>
+    </div>
+
+    <!-- Mensajes de error/éxito -->
+    <div id="authMessage" class="alert hidden"></div>
+  </div>
+</div>
+<script>
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
+  const linkShowRegister = document.getElementById('linkShowRegister');
+  const linkShowLogin = document.getElementById('linkShowLogin');
+  const alertBox = document.getElementById('authMessage');
+
+  // Mostrar solo login al inicio
+  loginForm.classList.remove('hidden');
+  registerForm.classList.add('hidden');
+
+  // Cambiar a registro
+  linkShowRegister.addEventListener('click', (e) => { 
+    e.preventDefault(); 
+    loginForm.classList.add('hidden');
+    registerForm.classList.remove('hidden');
+    alertBox.classList.add('hidden');
+  });
+
+  // Cambiar a login
+  linkShowLogin.addEventListener('click', (e) => { 
+    e.preventDefault(); 
+    registerForm.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+    alertBox.classList.add('hidden');
+  });
+
+  // ========== REGISTRO ==========
+  document.getElementById('btnRegister').addEventListener('click', async () => {
+    const email = document.getElementById('registerEmail').value.trim();
+    const pass = document.getElementById('registerPassword').value.trim();
+    const termsAccepted = document.getElementById('registerTerms').checked;
+
+    // Validar términos
+    if (!termsAccepted) {
+      alertBox.textContent = 'Debés aceptar los términos y condiciones';
+      alertBox.classList.remove('hidden', 'success');
+      alertBox.classList.add('error');
+      return;
+    }
+
+    // Validar campos
+    if (!email || !pass) {
+      alertBox.textContent = 'Completá email y contraseña';
+      alertBox.classList.remove('hidden', 'success');
+      alertBox.classList.add('error');
+      return;
+    }
+
+    if (pass.length < 6) {
+      alertBox.textContent = 'La contraseña debe tener al menos 6 caracteres';
+      alertBox.classList.remove('hidden', 'success');
+      alertBox.classList.add('error');
+      return;
+    }
+
+    // Crear cuenta
+    try {
+      await auth.createUserWithEmailAndPassword(email, pass);
+      alertBox.textContent = 'Cuenta creada. Redirigiendo...';
+      alertBox.classList.remove('hidden', 'error');
+      alertBox.classList.add('success');
+      setTimeout(() => { window.location.href = 'index.html'; }, 1000);
+    } catch (err) {
+      alertBox.textContent = err.message;
+      alertBox.classList.remove('hidden', 'success');
+      alertBox.classList.add('error');
+    }
+  });
+
+  // ========== LOGIN ==========
+  document.getElementById('btnLogin').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPassword').value.trim();
+
+    if (!email || !pass) {
+      alertBox.textContent = 'Completá email y contraseña';
+      alertBox.classList.remove('hidden', 'success');
+      alertBox.classList.add('error');
+      return;
+    }
+
+    try {
+      await auth.signInWithEmailAndPassword(email, pass);
+      window.location.href = 'index.html';
+    } catch (err) {
+      alertBox.textContent = 'Email o contraseña incorrectos';
+      alertBox.classList.remove('hidden', 'success');
+      alertBox.classList.add('error');
+    }
+  });
+
+  // Redirigir si ya está logueado
+  auth.onAuthStateChanged((user) => {
+    if (user) window.location.href = 'index.html';
+  });
+</script>
+</body>
+</html>
+

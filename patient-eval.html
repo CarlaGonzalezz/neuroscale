@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>NeuroScale - Evaluación paciente</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="cerebro (1).png" />
+<style>
+    /* Variables y reset */
+    :root {
+      --primary: #1e3a5f;
+      --muted: #718096;
+      --card: #fff;
+      --border: #e2e8f0;
+    }
+    
+    * { box-sizing: border-box; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f6f8fb;
+      color: #0f1724;
+      padding: 16px;
+    }
+    
+    .card {
+      background: var(--card);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(12,20,32,0.06);
+      max-width: 980px;
+      margin: 12px auto;
+    }
+    
+    h1, h2 {
+      margin: 0 0 8px 0;
+      font-weight: 600;
+    }
+    
+    p.muted {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin: 6px 0;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #eef2f7;
+      color: #0f1724;
+    }
+    
+    .scale-form {
+      margin-top: 12px;
+    }
+    
+    fieldset {
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 16px;
+      background: #fff;
+    }
+    
+    legend {
+      font-weight: 700;
+      color: var(--primary);
+      padding: 0 8px;
+      font-size: 1rem;
+    }
+    
+    label.q {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+    }
+    
+    /* Grid responsive para opciones */
+    .opts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    
+    /* Opción individual */
+    label.opt {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 12px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      background: white;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    
+    label.opt:hover {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+    
+    label.opt input[type="radio"] {
+      margin-bottom: 8px;
+    }
+    
+    label.opt img {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      margin: 8px 0;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      background: #f9fafb;
+      padding: 8px;
+    }
+    
+    label.opt span {
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: #374151;
+    }
+    
+    .result {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 6px;
+      background: #f3f7fb;
+      border-left: 3px solid var(--primary);
+    }
+    
+    footer {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 24px;
+    }
+    
+    .small {
+      font-size: 0.9rem;
+      color: #334155;
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    /* Responsive móvil */
+    @media (max-width: 640px) {
+      .opts {
+        grid-template-columns: 1fr;
+      }
+      
+      label.opt {
+        padding: 12px;
+      }
+      
+      label.opt img {
+        width: 60px;
+        height: 60px;
+      }
+    }
+</style>
+</head>
+<body>
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-direction: column; width:100%;">
+    <label style="margin:0;font-size:0.95rem;">
+      Buscar escala:
+    </label>
+    <input
+      type="text"
+      id="scaleSearch"
+      placeholder="Escriba el nombre de la escala…"
+      style="
+        width:100%;
+        padding:8px;
+        border-radius:6px;
+        border:1px solid #cbd5e1;
+        font-size:0.95rem;"/>
+    <label style="margin:4px 0 0 0;font-size:0.85rem;color:#64748b;">
+      Resultados:
+    </label>
+    <select
+      id="scaleSelect"
+      size="5"
+      style="
+        width:100%;
+        padding:6px;
+        border-radius:6px;
+        border:1px solid #cbd5e1;
+        font-size:0.95rem;"
+    ></select>
+    <button
+      id="btnLoadScale"
+      class="btn btn-secondary"
+      style="width:100%;">
+      Cargar escala
+    </button>
+  </div>  
+<footer>NeuroScale - Complete la escala desde su dispositivo</footer>
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<!-- Scales data -->
+<script src="scales-data.js"></script>
+<!-- Firebase config -->
+<script src="firebase-config.js"></script>
+<script>
+  (function(){
+    // ------------------------- helpers -------------------------
+    function qs(sel){ return document.querySelector(sel); }
+    function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
+    function escapeHtml(s){ return s == null ? "" : String(s)
+      .replaceAll('&','&amp;').replaceAll('<','&lt;')
+      .replaceAll('>','&gt;').replaceAll('"','&quot;')
+      .replaceAll("'",'&#39;'); }
+    function getParam(name){ return new URL(location.href).searchParams.get(name); }
+    // ------------------------- DOM refs -------------------------
+    const qrId = getParam('qr');
+    const statusEl = qs('#status');
+    const contentEl = qs('#content');
+    const suggestedEl = qs('#suggestedScale');
+    const scaleSelect = qs('#scaleSelect');
+    const scaleSearch = qs('#scaleSearch');
+    const btnLoadScale = qs('#btnLoadScale');
+    const scaleWrapper = qs('#scaleWrapper');
+    const btnCalculate = qs('#btnCalculate');
+    const btnSubmit = qs('#btnSubmit');
+    const scoreBox = qs('#scoreBox');
+    const finalMsg = qs('#finalMsg');
+    if (!qrId) {
+      statusEl.textContent = "URL inválida: falta parámetro QR.";
+      return;
+    }
+    statusEl.textContent = "Buscando QR...";
+    const db = firebase.database();
+    async function init() {
+      try {
+        // ---------- lectura QR ----------
+        const qrSnap = await db.ref(`qrCodes/${qrId}`).get();
+        if (!qrSnap.exists()) {
+          statusEl.textContent = "QR no encontrado o expirado.";
+          return;
+        }
+        const qr = qrSnap.val();
+        const medicoId = qr.medicoId;
+        const pacienteId = qr.pacienteId;
+        // ---------- paciente ----------
+        let paciente = null;
+        let pacienteNombre = `Paciente ${String(pacienteId).slice(0,6)}`;
+        try {
+          const pSnap = await db.ref(`pacientes/${medicoId}/${pacienteId}`).get();
+          if (pSnap.exists()) {
+            paciente = pSnap.val();
+            pacienteNombre = `${paciente.nombre || ''} ${paciente.apellido || ''}`.trim() || pacienteNombre;
+          }
+        } catch(e){
+          console.warn("No se pudo leer paciente (puede ser por reglas):", e);
+        }
+        // ---------- médico ----------
+        let medico = null;
+        let medicoEmail = null;
+        let medicoNombre = null;
+        try {
+          const mSnap = await db.ref(`medicos/${medicoId}`).get();
+          if (mSnap.exists()) {
+            medico = mSnap.val();
+            medicoEmail = medico.email || null;
+            medicoNombre = medico.nombre || null;
+          }
+        } catch(e){
+          console.warn("No se pudo leer medico:", e);
+        }
+        // ---------- escalas ----------
+        if (typeof SCALES_DATABASE !== "object") {
+          statusEl.textContent = "Error cargando escalas.";
+          return;
+        }
+        const allScales = Object.values(SCALES_DATABASE);
+        function renderScaleOptions(list) {
+          scaleSelect.innerHTML = "";
+          if (!list.length) {
+          const o = document.createElement("option");
+          o.textContent = "No se encontraron escalas";
+          o.disabled = true;
+          scaleSelect.appendChild(o);
+          return;
+          }
+        list.forEach(s => {
+        const o = document.createElement("option");
+        o.value = s.id;
+        o.textContent = s.name;
+        scaleSelect.appendChild(o);
+        });
+      }
+      // carga inicial
+      renderScaleOptions(allScales);
+      scaleSearch.addEventListener("input", () => {
+      const q = scaleSearch.value.toLowerCase().trim();
+      const filtered = allScales.filter(s =>
+      s.name.toLowerCase().includes(q)
+      );
+      renderScaleOptions(filtered);
+      });
+        // seleccionar escala sugerida
+        if (qr.escalaId && scaleSelect.querySelector(`option[value="${qr.escalaId}"]`)) {
+          scaleSelect.value = qr.escalaId;
+        }
+        suggestedEl.textContent = `${escapeHtml(scaleSelect.options[scaleSelect.selectedIndex].text)} — Paciente: ${escapeHtml(pacienteNombre)}`;
+        contentEl.classList.remove('hidden');
+        statusEl.textContent = "Listo. Cargue la escala.";    
+        // ---------- loader de escala ----------
+        let currentScale = null;
+        btnLoadScale.addEventListener('click', () => {
+          const id = scaleSelect.value;
+          loadScale(id);
+        });
+        function loadScale(id) {
+          currentScale = SCALES_DATABASE[id];
+          if (!currentScale) {
+            scaleWrapper.innerHTML = "<div class='small muted'>Escala no disponible</div>";
+            return;
+          }
+          suggestedEl.textContent = `${escapeHtml(currentScale.name)} — Paciente: ${escapeHtml(pacienteNombre)}`;
+          renderForm(currentScale);
+          btnSubmit.disabled = true;
+          scoreBox.textContent = "";
+          finalMsg.classList.add("hidden");
+        }
+        // auto cargar sugerida
+        loadScale(scaleSelect.value);
+        // ---------- render form ----------
+        function renderForm(scale) {
+          scaleWrapper.innerHTML = "";
+          const form = document.createElement("div");
+          form.className = "scale-form";
+          (scale.sections || []).forEach((sec, sIndex) => {
+            const fs = document.createElement("fieldset");
+            const lg = document.createElement("legend");
+            lg.textContent = sec.title || `Sección ${sIndex+1}`;
+            fs.appendChild(lg);
+            (sec.questions || []).forEach((q, qIndex) => {
+              const ql = document.createElement("label");
+              ql.className = "q";
+              ql.textContent = `${qIndex+1}. ${q.text}`;
+              fs.appendChild(ql);
+              // Contenedor de opciones con grid
+              const opts = document.createElement("div");
+              opts.className = "opts";
+              (q.options || []).forEach(opt => {
+                const id = `opt_${q.id}_${opt.value}_${Math.random().toString(36).slice(2,6)}`;
+                // Label contenedor
+                const lab = document.createElement("label");
+                lab.className = "opt";
+                // Radio button
+                const inp = document.createElement("input");
+                inp.type = "radio";
+                inp.name = q.id;
+                inp.value = opt.value;
+                inp.id = id;
+                // IMAGEN
+                if (opt.img) {
+                  const img = document.createElement("img");
+                  img.src = opt.img;
+                  img.alt = opt.label || "";
+                  // Si la imagen no carga, ocultarla
+                  img.onerror = function() {
+                    this.style.display = "none";
+                    console.warn("No se pudo cargar:", opt.img);
+                  };
+                  img.onload = function() {
+                    console.log("Imagen cargada:", opt.img);
+                  };
+                  lab.appendChild(img);
+                }
+                // Texto de la opción
+                const sp = document.createElement("span");
+                sp.textContent = opt.label || "";
+                lab.appendChild(inp);
+                lab.appendChild(sp);
+                opts.appendChild(lab);
+              });
+              fs.appendChild(opts);
+            });
+            form.appendChild(fs);
+          });
+          scaleWrapper.appendChild(form);
+        }
+        // ---------- cálculo ----------
+        function calculate() {
+          if (!currentScale) return {score:0, answers:{}, interpretation:null};
+          let score = 0;
+          const answers = {};
+          currentScale.sections.forEach(sec => {
+            sec.questions.forEach(q => {
+              const sel = document.querySelector(`input[name="${q.id}"]:checked`);
+              const val = sel ? Number(sel.value) : 0;
+              answers[q.id] = val;
+              score += val;
+            });
+          });
+          let interpretation = null;
+          if (currentScale.hasInterpretation && typeof currentScale.interpretation === "function") {
+            interpretation = currentScale.interpretation(score);
+          }
+          return {score, answers, interpretation};
+        }
+        btnCalculate.addEventListener("click", () => {
+          const {score, interpretation} = calculate();
+          scoreBox.textContent =
+            `Puntaje: ${score}` +
+            (interpretation ? ` — ${interpretation.level || interpretation}` : "");
+          btnSubmit.disabled = false;
+        });
+        // ---------- submit ----------
+        btnSubmit.addEventListener("click", async () => {
+          btnSubmit.disabled = true;
+          statusEl.textContent = "Enviando evaluación...";
+          try {
+            const {score, answers, interpretation} = calculate();
+            const evalId = db.ref().push().key;
+            const payload = {
+              pacienteId,
+              escalaId: currentScale.id,
+              escalaNombre: currentScale.name,
+              fecha: new Date().toISOString(),
+              respuestas: answers,
+              puntajeTotal: score,
+              interpretacion: interpretation ? (interpretation.level || interpretation) : null,
+              completadoPor: "paciente-qr",
+              estado: "completada"
+            };
+            // guardar evaluación
+            await db.ref(`evaluaciones/${medicoId}/${pacienteId}/${evalId}`).set(payload);
+            // crear notificación interna para el médico
+            const notifId = db.ref().push().key;
+            await db.ref(`notificaciones/${medicoId}/${notifId}`).set({
+              tipo: "nueva-evaluacion",
+              pacienteId,
+              pacienteNombre,
+              escalaId: currentScale.id,
+              escalaNombre: currentScale.name,
+              evalId,
+              fecha: new Date().toISOString(),
+              leida: false
+            });
+            // marcar QR como usado
+            try {
+              await db.ref(`qrCodes/${qrId}`).update({
+                estado: "usado",
+                fechaUsado: new Date().toISOString()
+              });
+            } catch(e){ console.warn("No se pudo actualizar QR:", e); }
+            // RESULTADO FINAL: Mostrar el mensaje de confirmación
+            statusEl.textContent = "Evaluación enviada.";
+            finalMsg.classList.remove("hidden");
+            finalMsg.innerHTML = "<strong>Gracias.</strong> Su evaluación fue registrada correctamente.";
+            qsa("input").forEach(i => i.disabled = true);
+          } catch(err) {
+            console.error(err);
+            statusEl.textContent = "Error enviando evaluación.";
+            btnSubmit.disabled = false;
+          }
+        });
+      } catch(err) {
+        console.error(err);
+        statusEl.textContent = "Error inicializando.";
+      }
+    }
+    init();
+  })();
+</script>
+</body>
+</html>
