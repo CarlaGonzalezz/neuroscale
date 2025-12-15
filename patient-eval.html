@@ -434,19 +434,20 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script src="scales-data.js"></script>
   <script src="firebase-config.js"></script>
-  <script>
-    firebase.auth().onAuthStateChanged(async (user) => {
-      if (!user) {
-        try {
-          await firebase.auth().signInAnonymously();
-          console.log("Paciente autenticado anónimamente");
-        } catch (e) {
-          console.error("Error autenticando paciente:", e);
-        }
-      } else {
-        console.log("Auth OK:", user.uid);
-      }
-    });
+  <script type="module">
+    import { getAuth, signInAnonymously, onAuthStateChanged } 
+      from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  
+    const auth = getAuth();
+  
+    signInAnonymously(auth)
+      .then(() => {
+        console.log("Paciente autenticado anónimamente");
+      })
+      .catch((error) => {
+        alert("Error de autenticación anónima");
+        console.error(error);
+      });
   </script>  
   <script>
     (function(){
