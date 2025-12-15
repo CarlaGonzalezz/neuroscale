@@ -434,7 +434,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <script src="scales-data.js"></script>
   <script src="firebase-config.js"></script>
-  
+  <script>
+    firebase.auth().signInAnonymously()
+      .then(() => {
+        console.log("Auth anónima activa");
+      })
+      .catch((error) => {
+        console.error("Error en auth anónima:", error);
+      });
+  </script>
   <script>
     (function(){
       function qs(sel){ return document.querySelector(sel); }
