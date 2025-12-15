@@ -435,14 +435,19 @@
   <script src="scales-data.js"></script>
   <script src="firebase-config.js"></script>
   <script>
-    firebase.auth().signInAnonymously()
-      .then(() => {
-        console.log("Auth anónima activa");
-      })
-      .catch((error) => {
-        console.error("Error en auth anónima:", error);
-      });
-  </script>
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (!user) {
+        try {
+          await firebase.auth().signInAnonymously();
+          console.log("Paciente autenticado anónimamente");
+        } catch (e) {
+          console.error("Error autenticando paciente:", e);
+        }
+      } else {
+        console.log("Auth OK:", user.uid);
+      }
+    });
+  </script>  
   <script>
     (function(){
       function qs(sel){ return document.querySelector(sel); }
