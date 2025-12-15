@@ -1,6 +1,3 @@
-# Firebase credentials
-firebase-config.js
-
 # Environment variables
 .env
 .env.local
