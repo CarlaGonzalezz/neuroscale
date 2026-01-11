@@ -163,26 +163,21 @@
       </aside>
       <main class="content">
         <!-- Dashboard -->
-<section id="view-dashboard" class="view active">
-  <h2>Inicio</h2>
-
-  <!-- NOTIFICACIONES INTERNAS -->
-  <div class="card">
-    <h3>Notificaciones</h3>
-
-    <div id="dashboardNotifications">
+        <section id="view-dashboard" class="view active">
+      <h2>Inicio</h2>
+      <!-- NOTIFICACIONES INTERNAS -->
+      <div class="card">
+      <h3>Notificaciones</h3>
+      <div id="dashboardNotifications">
       <!-- Mensaje por defecto -->
       <div class="no-notifications muted" style="color:#94a3b8; font-size:0.9rem;">
         No hay notificaciones nuevas
       </div>
-
       <!-- Lista real de notificaciones (JS escribe acá) -->
       <ul id="notificationList" class="list" style="margin-top:8px;"></ul>
+      </div>
     </div>
-  </div>
-
   <br>
-
   <!-- Estadísticas -->
   <div class="grid">
     <div class="card stat">
@@ -198,13 +193,12 @@
       <div class="stat-value" id="statTotalEvals">0</div>
     </div>
   </div>
-
   <!-- Últimos pacientes evaluados -->
   <div class="card">
     <h3>Últimos pacientes evaluados</h3>
     <ul id="lastEvaluatedList" class="list"></ul>
   </div>
-</section>
+        </section>
         <!-- Pacientes -->
         <section id="view-patients" class="view">
           <div class="toolbar">
@@ -239,59 +233,78 @@
         </section>
         <!-- Escalas -->
         <section id="view-scales" class="view">
-          <h2>Escalas</h2>
-          <!--BUSCADOR -->
-          <input
-            id="scaleSearch"
-            type="text"
-            placeholder="Buscar escala por nombre..."
-            style="
-              width: 100%;
-              padding: 10px 12px;
-              margin: 8px 0 14px 0;
-              border: 1px solid #cbd5e1;
-              border-radius: 6px;
-              font-size: 1rem;
-            "
-          />
-          <div id="scalesGrid" class="grid"></div>
-          <div id="scaleApply" class="card hidden scale-form"></div>
-          <!-- Modal para BUSCAR paciente -->
-          <div id="selectPatientModal" class="modal hidden">
-            <div class="modal-content" style="max-width: 420px">
-              <h3>Seleccionar paciente</h3>
-
-              <input
-                id="patientSearchInput"
-                type="text"
-                placeholder="Buscar por nombre o DNI..."
-                style="
-                  width: 100%;
-                  padding: 10px;
-                  margin: 10px 0;
-                  border: 1px solid #ccd;
-                  border-radius: 6px;
-                "
-              />
-
-              <div
-                id="patientSearchResults"
-                style="
-                  max-height: 260px;
-                  overflow-y: auto;
-                  border: 1px solid #e5e7eb;
-                  border-radius: 6px;
-                  padding: 6px;
-                "
-              ></div>
-
-              <div class="modal-actions" style="margin-top: 16px">
-                <button id="btnCancelSelectPatient" class="btn btn-secondary">
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
+        <h2>Escalas</h2>
+        <!-- BUSCADOR -->
+        <input
+        id="scaleSearch"
+        type="text"
+        placeholder="Buscar escala por nombre..."
+        style="
+          width: 100%;
+          padding: 10px 12px;
+          margin: 8px 0 14px 0;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          font-size: 1rem;"/>
+        <div id="scalesGrid" class="grid"></div>
+        <!-- (queda, aunque ya no se use directamente) -->
+        <div id="scaleApply" class="card hidden scale-form"></div>
+        <!-- Modal para BUSCAR paciente -->
+        <div id="selectPatientModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 420px">
+        <h3>Seleccionar paciente</h3>
+        <input
+        id="patientSearchInput"
+        type="text"
+        placeholder="Buscar por nombre o DNI..."
+        style="
+          width: 100%;
+          padding: 10px;
+          margin: 10px 0;
+          border: 1px solid #ccd;
+          border-radius: 6px;"/>
+        <div
+        id="patientSearchResults"
+        style="
+          max-height: 260px;
+          overflow-y: auto;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          padding: 6px;"
+          ></div>
+        <div class="modal-actions" style="margin-top: 16px">
+        <button id="btnCancelSelectPatient" class="btn btn-secondary">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL APLICAR ESCALA -->
+  <div id="scaleApplyModal" class="modal hidden">
+    <div
+      class="modal-content"
+      style="
+        max-width: 900px;
+        max-height: 90vh;
+        overflow-y: auto;">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;">
+        <h3 id="scaleApplyTitle" style="margin: 0"></h3>
+        <button
+          id="closeScaleApplyModal"
+          class="btn btn-secondary">
+          Cerrar
+        </button>
+      </div>
+      <div
+        id="scaleApplyModalBody"
+        style="margin-top: 16px"
+      ></div>
+    </div>
+  </div>
         </section>
         <!-- Reportes -->
         <section id="view-reports" class="view">

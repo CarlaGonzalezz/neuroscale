@@ -324,7 +324,7 @@ label {
 .form {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-lg);
+    gap: var(--spacing-sm);
 }  
 /* TABLA PROFESIONAL */
 .table {
@@ -513,14 +513,14 @@ label {
     padding: var(--spacing-xl);
 }
 .auth-container {
-    width: 100%;
-    max-width: 440px;
+    width: 50%;
+    max-width: 350px;
 }
 /* Logo cerebro en auth (visible, no hidden) */
 .logo-large {
     display: block;
-    width: 100px;
-    height: 100px;
+    width: 75px;
+    height: 75px;
     margin: 0 auto var(--spacing-xl);
     filter: drop-shadow(0 4px 12px rgba(107, 155, 142, 0.25));
 }
@@ -535,7 +535,6 @@ label {
 }  
 .auth-container .card {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    padding: var(--spacing-3xl);
     border: none;
 }
 /* Botón ACCEDER inicial - ocultarlo */

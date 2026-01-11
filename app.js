@@ -353,104 +353,156 @@ function initPatients(uid) {
       }
     });
 }
-/* Mostrar ficha de paciente con gráfico y botón Exportar PDF */
+/* Mostrar ficha de paciente con gráfico, filtros de escalas y botón volver */
 async function showPatientDetail(uid, patientId, container) {
-    try {
-      // Forzar vista de pacientes
-      showView("patients");
-      // Mostrar contenedor antes del gráfico
-      container.classList.remove("hidden");
-      const snap = await db.ref(`pacientes/${uid}/${patientId}`).get();
-      if (!snap.exists()) {
-        alert("Paciente no encontrado");
-        return;
-      }
-      const patient = snap.val();
-      container.innerHTML = `
-        <h3>${escapeHtml(patient.nombre)} ${escapeHtml(patient.apellido)}</h3>
-        <p>DNI: ${escapeHtml(patient.dni)} — Edad: ${escapeHtml(patient.edad)}</p>
-        <p>Diagnóstico: ${escapeHtml(patient.diagnostico)}</p>
-        <hr/>
-        <div style="width:100%; max-width:800px; height:280px; margin:auto;">
-          <canvas id="evolutionChart"></canvas>
-        </div>
-        <div class="actions" style="margin-top:12px;">
-          <button id="btnExportPatientPDF" class="btn btn-primary">Exportar PDF individual</button>
-        </div>
-        <div id="patientEvalsList" style="margin-top:12px;"></div>
+  try {
+    // Mostrar vista pacientes
+    showView("patients");
+    // Ocultar listado de pacientes
+    const patientsList = document.getElementById("patientsList");
+    if (patientsList) patientsList.classList.add("hidden");
+    // Mostrar contenedor de detalle
+    container.classList.remove("hidden");
+    // Traer datos del paciente
+    const snap = await db.ref(`pacientes/${uid}/${patientId}`).get();
+    if (!snap.exists()) {
+      alert("Paciente no encontrado");
+      return;
+    }
+    const patient = snap.val();
+    // Render base
+    container.innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <button id="btnBackToPatients" class="btn btn-secondary">← Volver</button>
+        <h3 style="margin:0;">
+          ${escapeHtml(patient.nombre)} ${escapeHtml(patient.apellido)}
+        </h3>
+      </div>
+      <p>DNI: ${escapeHtml(patient.dni)} — Edad: ${escapeHtml(patient.edad)}</p>
+      <p>Diagnóstico: ${escapeHtml(patient.diagnostico)}</p>
+      <hr/>
+      <!-- Filtros de escalas -->
+      <div id="scaleFilters" style="margin-bottom:12px;"></div>
+      <div style="width:100%; max-width:800px; height:280px; margin:auto;">
+        <canvas id="evolutionChart"></canvas>
+      </div>
+      <div class="actions" style="margin-top:12px;">
+        <button id="btnExportPatientPDF" class="btn btn-primary">
+          Exportar PDF individual
+        </button>
+      </div>
+    `;
+    // Botón volver
+    document.getElementById("btnBackToPatients").onclick = () => {
+      container.classList.add("hidden");
+      if (patientsList) patientsList.classList.remove("hidden");
+    };
+    // Traer evaluaciones
+    const evalsSnap = await db.ref(`evaluaciones/${uid}/${patientId}`).get();
+    const evalsObj = evalsSnap.val() || {};
+    const evals = Object.entries(evalsObj)
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    if (evals.length === 0) {
+      document.getElementById("scaleFilters").innerHTML =
+        "<em>No hay evaluaciones registradas</em>";
+      return;
+    }
+    // Labels (fechas únicas)
+    const labels = Array.from(
+      new Set(evals.map(e => e.fecha?.slice(0, 10)))
+    ).filter(Boolean);
+    // Normalizar nombres de escalas (evita duplicados históricos)
+    function normalizeScaleName(name) {
+    if (!name) return "Escala desconocida";
+    const n = name.toLowerCase();
+    // INCAT (nombre viejo vs nuevo)
+    if (n.includes("incat")) {
+    return "INCAT – Escala de Discapacidad";
+  }
+  return name;
+}
+    // Agrupar por escala (normalizada)
+    const byScale = {};
+    evals.forEach(e => {
+    const day = e.fecha?.slice(0, 10);
+    if (!day) return;
+    const scaleName = normalizeScaleName(e.escalaNombre);
+    byScale[scaleName] = byScale[scaleName] || {};
+    byScale[scaleName][day] = e.puntajeTotal;
+});
+    // Render filtros de escalas
+    const scaleFiltersEl = document.getElementById("scaleFilters");
+    scaleFiltersEl.innerHTML = "<strong>Escalas:</strong><br/>";
+    Object.keys(byScale).forEach(scaleName => {
+      const id = `chk_${scaleName.replace(/\s+/g, "_")}`;
+      scaleFiltersEl.innerHTML += `
+        <label style="margin-right:12px; display:inline-block;">
+          <input type="checkbox" checked data-scale="${scaleName}" id="${id}">
+          ${scaleName}
+        </label>
       `;
-      // Cargar evaluaciones
-      const evalsSnap = await db.ref(`evaluaciones/${uid}/${patientId}`).get();
-      const evalsObj = evalsSnap.val() || {};
-      const evals = Object.entries(evalsObj)
-        .map(([id, v]) => ({ id, ...v }))
-        .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-      // Preparar data
-      const labels = Array.from(new Set(evals.map((e) => e.fecha?.slice(0, 10))))
-        .filter(Boolean)
-        .sort();
-      const byScale = {};
-      evals.forEach((e) => {
-        const day = e.fecha ? e.fecha.slice(0, 10) : "Sin fecha";
-        byScale[e.escalaNombre] = byScale[e.escalaNombre] || {};
-        byScale[e.escalaNombre][day] = e.puntajeTotal;
-      });
-      const datasets = Object.entries(byScale).map(([name, points]) => ({
+    });
+    // Función para construir datasets según selección
+    function buildDatasets() {
+      const checkedScales = Array.from(
+        scaleFiltersEl.querySelectorAll("input:checked")
+      ).map(i => i.dataset.scale);
+      return checkedScales.map(name => ({
         label: name,
-        data: labels.map((l) => (points[l] ?? null)),
+        data: labels.map(l => byScale[name][l] ?? null),
         borderColor: randomColor(),
         borderWidth: 2,
         pointRadius: 3,
-        tension: 0.25,
+        tension: 0.25
       }));
-      // Crear gráfico
-      const ctx = document.getElementById("evolutionChart").getContext("2d");
-      if (window.evolutionChart instanceof Chart) {
-        window.evolutionChart.destroy();
-      }  
-      window.evolutionChart = new Chart(ctx, {
-        type: "line",
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            mode: "nearest",
-            intersect: false,
-          },
-          plugins: {
-            legend: { position: "bottom" },
-            tooltip: { enabled: true },
-          },
-          scales: {
-            x: {
-              ticks: {
-                autoSkip: true,
-                autoSkipPadding: 20,
-                maxRotation: 0,
-                minRotation: 0,
-              },
-            },
-            y: {
-              beginAtZero: true,
-            },
-          },
-        },
-      });
-      // Botón PDF
-      document.getElementById("btnExportPatientPDF").onclick = () => {
-        exportPatientReport(
-          uid,
-          patientId,
-          patient,
-          evals,
-          document.getElementById("evolutionChart")
-        );
-      };
-    } catch (err) {
-      console.error(err);
-      alert("Error cargando ficha: " + err.message);
     }
+    // Crear gráfico
+    const ctx = document.getElementById("evolutionChart").getContext("2d");
+    if (window.evolutionChart instanceof Chart) {
+      window.evolutionChart.destroy();
+    }
+    window.evolutionChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: buildDatasets()
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: "nearest",
+          intersect: false
+        },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: { enabled: true }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+    // Actualizar gráfico al cambiar selección
+    scaleFiltersEl.addEventListener("change", () => {
+      window.evolutionChart.data.datasets = buildDatasets();
+      window.evolutionChart.update();
+    });
+    // Exportar PDF
+    document.getElementById("btnExportPatientPDF").onclick = () => {
+      exportPatientReport(
+        uid,
+        patientId,
+        patient,
+        evals,
+        document.getElementById("evolutionChart")
+      );
+    };
+  } catch (err) {
+    console.error(err);
+    alert("Error cargando ficha: " + err.message);
+  }
 }
 /* Escalas: render y aplicar (Calcular / Guardar) */
 function initScales(uid) {
@@ -562,52 +614,71 @@ function initScales(uid) {
   });
 }
 async function showScaleApply(uid, patientId, scaleId) {
-  const container = document.getElementById("scaleApply");
-  if (!container) return;
-  container.classList.remove("hidden");
+  const modal = document.getElementById("scaleApplyModal");
+  const body = document.getElementById("scaleApplyModalBody");
+  const title = document.getElementById("scaleApplyTitle");
+  const btnClose = document.getElementById("closeScaleApplyModal");
+  if (!modal || !body || !title) return;
   const scale = SCALES_DATABASE[scaleId];
   if (!scale) {
-    container.innerHTML = `<div class="muted">Escala no disponible</div>`;
+    body.innerHTML = `<div class="muted">Escala no disponible</div>`;
+    modal.classList.remove("hidden");
     return;
   }
-  //RENDER UI PRINCIPAL
-  container.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="margin:0;">${escapeHtml(scale.name)}</h3>
-      <small class="muted">${escapeHtml(scale.category || "")}</small>
+  // Abrir modal
+  modal.classList.remove("hidden");
+  title.textContent = scale.name;
+  // Render UI principal
+  body.innerHTML = `
+    <small class="muted">${escapeHtml(scale.category || "")}</small>
+    <div id="scaleForm" class="scale-form" style="margin-top:16px;"></div>
+    <div class="actions" style="margin-top:20px; display:flex; gap:12px; flex-wrap:wrap;">
+      <button id="btnCalc" class="btn btn-secondary">Calcular</button>
+      <button id="btnSaveEval" class="btn btn-primary" disabled>Guardar</button>
     </div>
-    <div id="scaleForm" class="scale-form" style="margin-top:12px;"></div>
-    <div class="actions" style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
-      <button id="btnCalc" class="btn btn-secondary">
-        Calcular
-      </button>
-      <button id="btnSaveEval" class="btn btn-primary" disabled>
-        Guardar
-      </button>
-    </div>
-    <div id="scaleResult" class="card" style="margin-top:14px;"></div>
+    <div id="scaleResult" class="card" style="margin-top:16px;"></div>
   `;
-  // Render del formulario
+  // Render formulario
   renderScaleFormClean(scale, document.getElementById("scaleForm"));
-  //VARIABLES TEMPORALES
+  // Variables temporales
   let lastScore = null;
   let lastInterpret = null;
   let lastAnswers = null;
-  //BOTÓN: CALCULAR
+  // Calcular
   document.getElementById("btnCalc").onclick = () => {
-    const { score, interpretation, answers } = calculateScale(scale);
+    const { score, interpretation, answers, breakdown } = calculateScale(scale);
     lastScore = score;
     lastInterpret = interpretation;
     lastAnswers = answers;
     const resEl = document.getElementById("scaleResult");
-    resEl.innerHTML =
-      `<strong>Puntaje:</strong> ${escapeHtml(String(score))}` +
-      (interpretation
-        ? ` — ${escapeHtml(interpretation.level || interpretation)}`
-        : "");
+    let html = `<h4 style="margin-bottom:10px;">Resultado</h4>`;
+    html += `<p><strong>Puntaje total:</strong> ${score}</p>`;
+    // DESGLOSE ESPECIAL PARA SARA
+    if (scale.id === "sara") {
+      html += `<hr style="margin:12px 0;">`;
+      html += `<h5>Desglose por ítem</h5>`;
+      breakdown.forEach(item => {
+        if (item.average !== undefined) {
+          html += `
+            <div style="margin-bottom:8px;">
+              <strong>${item.text}</strong><br>
+              Derecho: ${item.right} · Izquierdo: ${item.left}<br>
+              <em>Promedio usado: ${item.average}</em>
+            </div>
+          `;
+        } else {
+          html += `
+            <div style="margin-bottom:6px;">
+              <strong>${item.text}:</strong> ${item.value}
+            </div>
+          `;
+        }
+      });
+    }
+    resEl.innerHTML = html;
     document.getElementById("btnSaveEval").disabled = false;
   };
-  //BOTÓN: GUARDAR EN FIREBASE
+  // Guardar
   document.getElementById("btnSaveEval").onclick = async () => {
     if (lastScore === null) {
       alert("Calculá el puntaje antes de guardar.");
@@ -630,22 +701,32 @@ async function showScaleApply(uid, patientId, scaleId) {
         estado: "completada",
       };
       await db.ref(`evaluaciones/${uid}/${patientId}/${evalId}`).set(payload);
+      // Cerrar modal automáticamente
+      const modal = document.getElementById("scaleApplyModal");
+      const body = document.getElementById("scaleApplyModalBody");
+      if (modal) modal.classList.add("hidden");
+      if (body) body.innerHTML = "";
       alert("Evaluación guardada correctamente.");
-      document.getElementById("btnSaveEval").disabled = true;
     } catch (err) {
       console.error(err);
       alert("Error al guardar evaluación: " + err.message);
     }
-  };
-  //BOTÓN: GENERAR QR
-  document.getElementById("btnQRScale").onclick = () => {
-    generateQRForScale(uid, patientId, scaleId);
+  };  
+  // Cerrar modal
+  btnClose.onclick = () => {
+    modal.classList.add("hidden");
+    body.innerHTML = "";
   };
 }
 /* Render limpio de preguntas y opciones */
 function renderScaleFormClean(scale, container) {
   container.innerHTML = "";
-  
+  const saraBilateralIds = [
+    "sara_finger_chase",
+    "sara_nose_finger",
+    "sara_fast_hand",
+    "sara_heel_shin",
+  ];
   scale.sections.forEach((sec, sIndex) => {
     const fieldset = document.createElement("fieldset");
     fieldset.style.border = "1px solid #e2e8f0";
@@ -653,7 +734,6 @@ function renderScaleFormClean(scale, container) {
     fieldset.style.padding = "16px";
     fieldset.style.marginTop = "16px";
     fieldset.style.background = "#fff";
-    
     const legend = document.createElement("legend");
     legend.textContent = sec.title || `Sección ${sIndex + 1}`;
     legend.style.fontWeight = "700";
@@ -661,11 +741,9 @@ function renderScaleFormClean(scale, container) {
     legend.style.padding = "0 8px";
     legend.style.fontSize = "1rem";
     fieldset.appendChild(legend);
-    
     sec.questions.forEach((q, qIndex) => {
       const row = document.createElement("div");
-      row.style.marginTop = "12px";
-      
+      row.style.marginTop = "16px";
       const label = document.createElement("label");
       label.textContent = `${qIndex + 1}. ${q.text}`;
       label.style.display = "block";
@@ -673,18 +751,84 @@ function renderScaleFormClean(scale, container) {
       label.style.marginBottom = "12px";
       label.style.fontSize = "0.95rem";
       row.appendChild(label);
-      
-      // Grid responsive para opciones
+      // SARA bilateral
+      if (scale.id === "sara" && saraBilateralIds.includes(q.id)) {
+        const grid = document.createElement("div");
+        grid.style.display = "grid";
+        grid.style.gridTemplateColumns = "1fr 1fr";
+        grid.style.gap = "16px";
+        ["R", "L"].forEach((side) => {
+          const col = document.createElement("div");
+          const sideTitle = document.createElement("div");
+          sideTitle.textContent = side === "R" ? "Derecho" : "Izquierdo";
+          sideTitle.style.fontWeight = "700";
+          sideTitle.style.marginBottom = "8px";
+          sideTitle.style.color = "#1e3a5f";
+          col.appendChild(sideTitle);
+          const opts = document.createElement("div");
+          opts.style.display = "grid";
+          opts.style.gridTemplateColumns = "repeat(auto-fit, minmax(140px, 1fr))";
+          opts.style.gap = "10px";
+          q.options.forEach((opt) => {
+            const id = `${q.id}_${side}_${opt.value}_${Math.random()
+              .toString(36)
+              .slice(2, 6)}`;
+            const wrap = document.createElement("label");
+            wrap.style.display = "flex";
+            wrap.style.flexDirection = "column";
+            wrap.style.alignItems = "center";
+            wrap.style.padding = "12px";
+            wrap.style.border = "2px solid #e2e8f0";
+            wrap.style.borderRadius = "8px";
+            wrap.style.cursor = "pointer";
+            wrap.style.backgroundColor = "white";
+            wrap.style.textAlign = "center";
+            const input = document.createElement("input");
+            input.type = "radio";
+            input.name = `${q.id}_${side}`;
+            input.value = opt.value;
+            input.id = id;
+            input.style.marginBottom = "6px";
+            wrap.appendChild(input);
+            const span = document.createElement("span");
+            span.textContent = opt.label;
+            span.style.fontSize = "0.8rem";
+            span.style.lineHeight = "1.4";
+            span.style.color = "#374151";
+            wrap.appendChild(span);
+            input.addEventListener("change", () => {
+              document
+                .querySelectorAll(`input[name="${q.id}_${side}"]`)
+                .forEach((r) => {
+                  const p = r.closest("label");
+                  if (!p) return;
+                  if (r.checked) {
+                    p.style.borderColor = "#1e3a5f";
+                    p.style.backgroundColor = "#f0f9ff";
+                  } else {
+                    p.style.borderColor = "#e2e8f0";
+                    p.style.backgroundColor = "white";
+                  }
+                });
+            });
+            opts.appendChild(wrap);
+          });
+          col.appendChild(opts);
+          grid.appendChild(col);
+        });
+        row.appendChild(grid);
+        fieldset.appendChild(row);
+        return;
+      }
+      // Todas las demás preguntas
       const opts = document.createElement("div");
       opts.style.display = "grid";
       opts.style.gridTemplateColumns = "repeat(auto-fit, minmax(180px, 1fr))";
       opts.style.gap = "12px";
-      opts.style.marginTop = "12px";
-      
       q.options.forEach((opt) => {
-        const id = `${q.id}_${opt.value}_${Math.random().toString(36).slice(2,6)}`;
-        
-        // Label contenedor
+        const id = `${q.id}_${opt.value}_${Math.random()
+          .toString(36)
+          .slice(2, 6)}`;
         const wrap = document.createElement("label");
         wrap.style.display = "flex";
         wrap.style.flexDirection = "column";
@@ -693,111 +837,87 @@ function renderScaleFormClean(scale, container) {
         wrap.style.border = "2px solid #e2e8f0";
         wrap.style.borderRadius = "8px";
         wrap.style.cursor = "pointer";
-        wrap.style.transition = "all 0.2s";
         wrap.style.backgroundColor = "white";
         wrap.style.textAlign = "center";
-        
-        // Radio button
         const input = document.createElement("input");
         input.type = "radio";
         input.name = q.id;
         input.value = opt.value;
         input.id = id;
-        input.style.cursor = "pointer";
         input.style.marginBottom = "8px";
-        
         wrap.appendChild(input);
-        
-        // IMAGEN (si existe) - ANTES del texto
-        if (opt.img) {
-          const img = document.createElement("img");
-          img.src = opt.img;
-          img.alt = opt.label;
-          img.style.width = "80px";
-          img.style.height = "80px";
-          img.style.objectFit = "contain";
-          img.style.margin = "8px 0";
-          img.style.border = "1px solid #e5e7eb";
-          img.style.borderRadius = "4px";
-          img.style.backgroundColor = "#f9fafb";
-          img.style.padding = "8px";
-          
-          img.onerror = function() {
-            this.style.display = "none";
-            console.warn("No se pudo cargar:", opt.img);
-          };
-          
-          wrap.appendChild(img);
-        }
-        
-        // Texto DESPUÉS de la imagen
         const span = document.createElement("span");
         span.textContent = opt.label;
         span.style.fontSize = "0.85rem";
-        span.style.lineHeight = "1.4";
         span.style.color = "#374151";
-        span.style.marginTop = "4px";
-        
         wrap.appendChild(span);
-        
-        // Efectos hover
-        wrap.addEventListener("mouseenter", () => {
-          wrap.style.borderColor = "#3b82f6";
-          wrap.style.backgroundColor = "#eff6ff";
-        });
-        
-        wrap.addEventListener("mouseleave", () => {
-          if (!input.checked) {
-            wrap.style.borderColor = "#e2e8f0";
-            wrap.style.backgroundColor = "white";
-          }
-        });
-        
-        // Marcar visualmente cuando se selecciona
         input.addEventListener("change", () => {
-          document.querySelectorAll(`input[name="${q.id}"]`).forEach(radio => {
-            const parentLabel = radio.closest("label");
-            if (parentLabel) {
-              if (radio.checked) {
-                parentLabel.style.borderColor = "#1e3a5f";
-                parentLabel.style.backgroundColor = "#f0f9ff";
-                parentLabel.style.boxShadow = "0 0 0 3px rgba(30, 58, 95, 0.1)";
-              } else {
-                parentLabel.style.borderColor = "#e2e8f0";
-                parentLabel.style.backgroundColor = "white";
-                parentLabel.style.boxShadow = "none";
-              }
+          document.querySelectorAll(`input[name="${q.id}"]`).forEach((r) => {
+            const p = r.closest("label");
+            if (!p) return;
+            if (r.checked) {
+              p.style.borderColor = "#1e3a5f";
+              p.style.backgroundColor = "#f0f9ff";
+            } else {
+              p.style.borderColor = "#e2e8f0";
+              p.style.backgroundColor = "white";
             }
           });
         });
-        
         opts.appendChild(wrap);
       });
-      
       row.appendChild(opts);
       fieldset.appendChild(row);
     });
-    
     container.appendChild(fieldset);
   });
 }
-/* Calcula puntaje, devuelve respuestas y posible interpretación */
+/* Calcula puntaje, devuelve respuestas, interpretación y desglose (SARA) */
 function calculateScale(scale) {
-    let score = 0;
-    const answers = {};
-    scale.sections.forEach((sec) => {
-      sec.questions.forEach((q) => {
+  let score = 0;
+  const answers = {};
+  const breakdown = [];
+  scale.sections.forEach((sec) => {
+    sec.questions.forEach((q) => {
+      // SARA BILATERAL (items 5–8)
+      if (
+        scale.id === "sara" &&
+        ["sara_finger_chase", "sara_nose_finger", "sara_fast_hand", "sara_heel_shin"].includes(q.id)
+      ) {
+        const right = document.querySelector(`input[name="${q.id}_R"]:checked`);
+        const left = document.querySelector(`input[name="${q.id}_L"]:checked`);
+        const valR = right ? Number(right.value) : 0;
+        const valL = left ? Number(left.value) : 0;
+        const avg = (valR + valL) / 2;
+        answers[`${q.id}_R`] = valR;
+        answers[`${q.id}_L`] = valL;
+        score += avg;
+        breakdown.push({
+          id: q.id,
+          text: q.text,
+          right: valR,
+          left: valL,
+          average: avg,
+        });
+      } else {
+        // Todas las demás escalas + ítems 1–4 SARA
         const sel = document.querySelector(`input[name="${q.id}"]:checked`);
         const val = sel ? Number(sel.value) : 0;
         answers[q.id] = val;
         score += val;
-      });
+        breakdown.push({
+          id: q.id,
+          text: q.text,
+          value: val,
+        });
+      }
     });
-    let interpretation = null;
-    if (scale.hasInterpretation && typeof scale.interpretation === "function") {
-      interpretation = scale.interpretation(score);
-    }
-    return { score, interpretation, answers };
+  });
+  let interpretation = null;
+  if (scale.hasInterpretation && typeof scale.interpretation === "function") {
+    interpretation = scale.interpretation(score);
+  }
+  return { score, interpretation, answers, breakdown };
 }
 /* REPORTES: con filtros funcionales en tiempo real */
 function initReports(uid) {
@@ -1327,7 +1447,7 @@ async function generateQRForPatient(uid, patientId) {
   try {
     const scaleId = Object.keys(SCALES_DATABASE)[0] || "incat";
     const evalId = db.ref().push().key;
-    const qrId = db.ref().push().key;   
+    const qrId = db.ref().push().key;
     // Guardar datos del QR en Firebase
     await db.ref(`qrCodes/${qrId}`).set({
       medicoId: uid,
@@ -1338,15 +1458,10 @@ async function generateQRForPatient(uid, patientId) {
       fechaCreacion: new Date().toISOString(),
       fechaExpiracion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    // URL automática - funciona en desarrollo Y producción
+    // URL automática
     const baseURL = getBaseURL();
     const url = `${baseURL}patient-eval.html?qr=${encodeURIComponent(qrId)}`;
-    console.log('QR generado:', {
-      entorno: window.location.hostname,
-      baseURL: baseURL,
-      urlCompleta: url
-    });
-    // Mostrar modal con QR
+    // Modal
     const modal = document.createElement("div");
     modal.className = "modal";
     modal.style.zIndex = 9999;
@@ -1354,24 +1469,36 @@ async function generateQRForPatient(uid, patientId) {
       <div class="modal-content">
         <h3>QR para paciente</h3>
         <p style="font-size:0.9rem;color:#64748b;margin-bottom:12px;">
-          Escanea este código con tu celular para completar la evaluación
+          Escaneá este código o compartí el link con el paciente
         </p>
-        <div id="qrBox_${qrId}" style="display:flex;justify-content:center;padding:16px;background:#f8f9fa;border-radius:8px;margin:12px 0;"></div>
+        <div id="qrBox_${qrId}"
+          style="display:flex;justify-content:center;padding:16px;background:#f8f9fa;border-radius:8px;margin:12px 0;">
+        </div>
         <details style="margin-top:12px;">
-          <summary style="cursor:pointer;color:#1e3a5f;font-size:0.85rem;padding:8px 0;">
+          <summary style="cursor:pointer;color:#1e3a5f;font-size:0.85rem;">
             Ver URL completa
           </summary>
-          <p style="font-size:11px;color:#94a3b8;word-break:break-all;background:#f8f9fa;padding:8px;border-radius:4px;margin-top:8px;font-family:monospace;">
+          <p style="font-size:11px;color:#94a3b8;word-break:break-all;
+                    background:#f8f9fa;padding:8px;border-radius:4px;
+                    margin-top:8px;font-family:monospace;">
             ${escapeHtml(url)}
           </p>
         </details>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" id="closeQr_${qrId}">Cerrar</button>
+        <div class="modal-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="shareQr_${qrId}">
+            Compartir link
+          </button>
+          <button class="btn btn-secondary" id="copyQr_${qrId}">
+            Copiar link
+          </button>
+          <button class="btn btn-secondary" id="closeQr_${qrId}">
+            Cerrar
+          </button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
-    // Renderizar QR
+    // Render QR
     new QRCode(document.getElementById(`qrBox_${qrId}`), {
       text: url,
       width: 200,
@@ -1380,8 +1507,30 @@ async function generateQRForPatient(uid, patientId) {
       colorLight: "#ffffff",
       correctLevel: QRCode.CorrectLevel.H
     });
-    // Cerrar modal
-    document.getElementById(`closeQr_${qrId}`).onclick = () => document.body.removeChild(modal);
+    // Compartir (WhatsApp / Mail en mobile)
+    document.getElementById(`shareQr_${qrId}`).onclick = async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "Evaluación NeuroScale",
+            text: "Completá esta escala desde tu celular",
+            url: url
+          });
+        } catch (_) {}
+      } else {
+        alert("Este navegador no permite compartir directamente. Podés copiar el link.");
+      }
+    };
+    // Copiar link
+    document.getElementById(`copyQr_${qrId}`).onclick = async () => {
+      await navigator.clipboard.writeText(url);
+      const btn = document.getElementById(`copyQr_${qrId}`);
+      btn.textContent = "Link copiado!";
+      setTimeout(() => (btn.textContent = "Copiar link"), 2000);
+    };
+    // Cerrar
+    document.getElementById(`closeQr_${qrId}`).onclick = () =>
+      document.body.removeChild(modal);
   } catch (err) {
     console.error("Error generando QR:", err);
     alert("Error generando QR: " + err.message);
@@ -1401,14 +1550,8 @@ async function generateQRForScale(uid, patientId, scaleId) {
       fechaCreacion: new Date().toISOString(),
       fechaExpiracion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    // URL automática - funciona en desarrollo Y producción
     const baseURL = getBaseURL();
     const url = `${baseURL}patient-eval.html?qr=${encodeURIComponent(qrId)}`;
-    console.log('QR para escala generado:', {
-      escala: scaleId,
-      urlCompleta: url
-    });
-    // Mostrar modal con QR
     const modal = document.createElement("div");
     modal.className = "modal";
     modal.style.zIndex = 9999;
@@ -1416,21 +1559,31 @@ async function generateQRForScale(uid, patientId, scaleId) {
       <div class="modal-content">
         <h3>QR para esta escala</h3>
         <p style="font-size:0.9rem;color:#64748b;margin-bottom:12px;">
-          El paciente podrá completar esta escala desde su celular.
+          El paciente podrá completar esta escala desde su celular
         </p>
-        <div id="qrBox_${qrId}" 
-            style="display:flex;justify-content:center;padding:16px;background:#f8f9fa;border-radius:8px;margin:12px 0;">
+        <div id="qrBox_${qrId}"
+          style="display:flex;justify-content:center;padding:16px;background:#f8f9fa;border-radius:8px;margin:12px 0;">
         </div>
         <details>
           <summary style="cursor:pointer;color:#1e3a5f;font-size:0.85rem;">
             Ver URL completa
           </summary>
-          <p style="font-size:11px;color:#94a3b8;word-break:break-all;background:#f8f9fa;padding:8px;border-radius:4px;margin-top:8px;font-family:monospace;">
+          <p style="font-size:11px;color:#94a3b8;word-break:break-all;
+                    background:#f8f9fa;padding:8px;border-radius:4px;
+                    margin-top:8px;font-family:monospace;">
             ${escapeHtml(url)}
           </p>
         </details>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" id="closeQr_${qrId}">Cerrar</button>
+        <div class="modal-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="shareQr_${qrId}">
+            Compartir link
+          </button>
+          <button class="btn btn-secondary" id="copyQr_${qrId}">
+            Copiar link
+          </button>
+          <button class="btn btn-secondary" id="closeQr_${qrId}">
+            Cerrar
+          </button>
         </div>
       </div>
     `;
@@ -1441,8 +1594,25 @@ async function generateQRForScale(uid, patientId, scaleId) {
       height: 200,
       colorDark: "#1e3a5f",
       colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.H,
+      correctLevel: QRCode.CorrectLevel.H
     });
+    document.getElementById(`shareQr_${qrId}`).onclick = async () => {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Evaluación NeuroScale",
+          text: "Completá esta escala desde tu celular",
+          url: url
+        });
+      } else {
+        alert("Podés copiar el link para compartirlo.");
+      }
+    };
+    document.getElementById(`copyQr_${qrId}`).onclick = async () => {
+      await navigator.clipboard.writeText(url);
+      const btn = document.getElementById(`copyQr_${qrId}`);
+      btn.textContent = "Link copiado!";
+      setTimeout(() => (btn.textContent = "Copiar link"), 2000);
+    };
     document.getElementById(`closeQr_${qrId}`).onclick = () =>
       document.body.removeChild(modal);
   } catch (err) {
@@ -1454,6 +1624,3 @@ async function generateQRForScale(uid, patientId, scaleId) {
 // console.log('URL base detectada:', getBaseURL());
 // console.log('Hostname:', window.location.hostname);
 // console.log('Entorno:', window.location.hostname === 'localhost' ? 'DESARROLLO' : 'PRODUCCIÓN');
-
-
-/* Fin de archivo */
