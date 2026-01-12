@@ -513,7 +513,7 @@ label {
     padding: var(--spacing-xl);
 }
 .auth-container {
-    width: 50%;
+    width: 75%;
     max-width: 350px;
 }
 /* Logo cerebro en auth (visible, no hidden) */
